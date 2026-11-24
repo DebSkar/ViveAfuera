@@ -1,6 +1,8 @@
 # 🌿 VIVE AFUERA
 ### *La ilusión del tacto digital*
 
+## https://debskar.github.io/ViveAfuera/exp.html
+
 Una experiencia interactiva, inmersiva y crítica sobre la virtualidad, el contacto físico recíproco y la naturaleza simulada.
 
 ---
