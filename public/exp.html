@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vive Afuera · Experiencia 3D</title>
+<link rel="stylesheet" href="ui.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0c1218; font-family: system-ui, -apple-system, sans-serif; color: #fff; }
+  
+  #canvasContainer { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #canvasContainer canvas { width: 100%; height: 100%; display: block; transition: filter 0.35s ease, opacity 0.35s ease; }
+
+  /* Superposición de Realidad con Marco Rojo Futurista (Estilo Advertencia Sci-Fi) */
+  #realityOverlay {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at center, rgba(35, 4, 10, 0.88) 0%, rgba(8, 2, 4, 0.98) 100%);
+    opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 20;
+    backdrop-filter: blur(8px);
+  }
+  #realityOverlay.active { opacity: 1; pointer-events: auto; }
+
+  .hud-warning-container {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 90vw; max-width: 1350px; height: 86vh; position: relative;
+    filter: drop-shadow(0 0 25px rgba(239, 68, 68, 0.65));
+    animation: hudGlow 3s infinite alternate ease-in-out;
+  }
+  @keyframes hudGlow {
+    from { filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.5)); }
+    to { filter: drop-shadow(0 0 32px rgba(255, 26, 64, 0.9)); }
+  }
+
+  /* Encabezado Superior ADVERTENCIA */
+  .hud-warning-header {
+    background: linear-gradient(90deg, #991b1b, #ef4444, #dc2626, #991b1b);
+    color: #fff; padding: 7px 38px; border-radius: 4px 4px 0 0;
+    font-weight: 900; letter-spacing: 0.2em; font-size: 1.15rem; text-transform: uppercase;
+    display: flex; align-items: center; gap: 14px;
+    clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 100%, 0 100%);
+    box-shadow: 0 -4px 20px rgba(239, 68, 68, 0.8);
+    z-index: 2; margin-bottom: -2px;
+  }
+  .hud-hazard-stripes {
+    font-family: monospace; letter-spacing: -2px; color: #fee2e2; opacity: 0.85; font-size: 1.15rem;
+  }
+  .hud-warning-title {
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.95), 0 2px 4px rgba(0,0,0,0.9);
+  }
+
+  /* Marco Central Rojo Sci-Fi */
+  .hud-warning-frame {
+    position: relative; width: 100%; flex: 1; min-height: 0;
+    border: 3px solid #ef4444; background: #000;
+    box-shadow: 0 0 35px rgba(239, 68, 68, 0.55), inset 0 0 30px rgba(239, 68, 68, 0.35);
+    overflow: hidden;
+    clip-path: polygon(
+      24px 0, calc(100% - 24px) 0, 100% 24px, 100% calc(100% - 24px),
+      calc(100% - 24px) 100%, 24px 100%, 0 calc(100% - 24px), 0 24px
+    );
+  }
+
+  /* Esquinas HUD angulares */
+  .hud-corner {
+    position: absolute; width: 32px; height: 32px;
+    border-color: #ff2255; border-style: solid; z-index: 5; pointer-events: none;
+  }
+  .hud-corner.top-left { top: 6px; left: 6px; border-width: 4px 0 0 4px; }
+  .hud-corner.top-right { top: 6px; right: 6px; border-width: 4px 4px 0 0; }
+  .hud-corner.bottom-left { bottom: 6px; left: 6px; border-width: 0 0 4px 4px; }
+  .hud-corner.bottom-right { bottom: 6px; right: 6px; border-width: 0 4px 4px 0; }
+
+  #cameraFeed {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    filter: contrast(1.08) saturate(1.15);
+  }
+
+  /* Pie Inferior con la Frase */
+  .hud-warning-footer {
+    background: linear-gradient(90deg, rgba(30, 4, 8, 0.96), rgba(185, 28, 28, 0.96), rgba(30, 4, 8, 0.96));
+    border: 2px solid #ef4444; border-top: none;
+    padding: 14px 34px; width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 20px) 100%, 20px 100%);
+    box-shadow: 0 8px 30px rgba(239, 68, 68, 0.7);
+    z-index: 2; margin-top: -2px;
+  }
+  .hud-chevron {
+    color: #fca5a5; font-weight: 900; letter-spacing: -2px; font-size: 1.3rem;
+  }
+  .hud-reality-text {
+    font-size: 1.75rem; font-weight: 800; letter-spacing: 0.05em; color: #fff;
+    text-align: center; margin: 0; text-shadow: 0 0 16px rgba(255, 60, 90, 0.9), 0 2px 6px #000;
+  }
+
+  /* Controles y HUD superior sutil */
+  #hudTop {
+    position: absolute; top: 16px; left: 20px; right: 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    pointer-events: none; z-index: 5; transition: opacity 0.4s ease;
+  }
+  #titleBadge {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(10, 16, 22, 0.6); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.12); padding: 8px 16px; border-radius: 999px;
+    font-size: 0.85rem; letter-spacing: 0.08em; pointer-events: auto;
+  }
+  #titleBadge b { font-weight: 700; color: #6ee7b7; }
+  #statusDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+  #statusDot.connected { background: #34d399; box-shadow: 0 0 10px #34d399; }
+
+  /* Botones de acción superior */
+  #topActions { display: flex; gap: 8px; pointer-events: auto; }
+  .hud-btn {
+    background: rgba(10, 16, 22, 0.6); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.15); color: #fff;
+    padding: 8px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .hud-btn:hover { background: rgba(30, 41, 59, 0.85); border-color: rgba(255,255,255,0.3); }
+
+  /* Tarjeta flotante del QR / Conexión del Teléfono */
+  #qrCard {
+    position: absolute; bottom: 20px; right: 20px; z-index: 5;
+    background: rgba(13, 20, 28, 0.88); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.18); border-radius: var(--r-l);
+    padding: 16px 14px; max-width: 220px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #qrCard.minimized {
+    padding: 8px 14px; max-width: auto; flex-direction: row; cursor: pointer;
+  }
+  #qrCard.minimized #qrImg, #qrCard.minimized #qrInstructions { display: none; }
+  #qrCard.minimized #qrConnectedBadge { display: flex; align-items: center; gap: 8px; }
+  #qrConnectedBadge { display: none; font-size: 0.8rem; font-weight: 600; color: #a7f3d0; }
+
+  #qrImg {
+    width: 155px; height: 155px; background: #fff; border-radius: var(--r-m); padding: 6px; display: block;
+  }
+  #qrInstructions { font-size: 0.8rem; text-align: center; color: #e2e8f0; line-height: 1.4; font-weight: 600; }
+
+  /* Prompt inicial para habilitar audio si el navegador lo bloquea */
+  #audioPrompt {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(16, 185, 129, 0.9); color: #022c22; font-weight: 700;
+    font-size: 0.9rem; padding: 10px 22px; border-radius: 999px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); z-index: 6;
+    animation: pulse 2s infinite ease-in-out;
+  }
+  @keyframes pulse { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } }
+</style>
+</head>
+<body>
+
+  <!-- Escenario 3D Three.js -->
+  <div id="canvasContainer"></div>
+
+  <!-- Superposición de la Cámara Real con Marco Rojo Futurista (Estilo Advertencia Sci-Fi) -->
+  <div id="realityOverlay">
+    <div class="hud-warning-container">
+      <div class="hud-warning-header">
+        <span class="hud-hazard-stripes">///</span>
+        <span class="hud-warning-title">⚠ ADVERTENCIA ⚠</span>
+        <span class="hud-hazard-stripes">///</span>
+      </div>
+
+      <div class="hud-warning-frame">
+        <div class="hud-corner top-left"></div>
+        <div class="hud-corner top-right"></div>
+        <div class="hud-corner bottom-left"></div>
+        <div class="hud-corner bottom-right"></div>
+        <img id="cameraFeed" alt="Vista del suelo real capturado por el teléfono" />
+      </div>
+
+      <div class="hud-warning-footer">
+        <span class="hud-chevron">&gt;&gt;&gt;</span>
+        <h1 class="hud-reality-text">Esto no es real, toca pasto de verdad.</h1>
+        <span class="hud-chevron">&lt;&lt;&lt;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD Superior -->
+  <div id="hudTop">
+    <div id="titleBadge">
+      <span id="statusDot"></span>
+      <b>VIVE AFUERA</b> · <span id="statusText">Esperando visor…</span>
+      <span id="hdriStatus" style="margin-left: 8px; font-size: 0.76rem; color: #6ee7b7; transition: opacity 0.5s ease;">🌅 Cargando HDRI 360°...</span>
+    </div>
+
+    <div id="topActions">
+      <button class="hud-btn" id="audioToggle">🔊 Sonido</button>
+      <button class="hud-btn" id="fullscreenBtn">⛶ Pantalla Completa</button>
+    </div>
+  </div>
+
+  <!-- Tarjeta del Código QR -->
+  <div id="qrCard">
+    <div id="qrConnectedBadge">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399"></span>
+      <span id="connectedDevName">Visor Conectado</span>
+    </div>
+    <img id="qrImg" alt="Código QR para conectar el teléfono" />
+    <div id="qrInstructions">
+      Escanea con tu celular para vivir la experiencia
+    </div>
+  </div>
+
+  <!-- Botón de Audio Inicial -->
+  <button id="audioPrompt">🔊 Toca para activar el paisaje sonoro</button>
+
+  <!-- Scripts -->
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/fflate.min.js"></script>
+  <script src="vendor/EXRLoader.js"></script>
+  <script src="config.js"></script>
+  <script src="tacto.js"></script>
+  <script src="paisaje3d.js"></script>
+
+  <script>
+    'use strict';
+    const container = document.getElementById('canvasContainer');
+    const paisaje = new Paisaje3D(container);
+
+    // Audio Inicial
+    const audioPrompt = document.getElementById('audioPrompt');
+    const startAudioHandler = () => {
+      paisaje.startAudio();
+      audioPrompt.style.display = 'none';
+      window.removeEventListener('pointerdown', startAudioHandler);
+    };
+    audioPrompt.addEventListener('click', startAudioHandler);
+    window.addEventListener('pointerdown', startAudioHandler, { once: true });
+
+    document.getElementById('audioToggle').onclick = () => {
+      paisaje.startAudio();
+    };
+
+    // Pantalla Completa
+    document.getElementById('fullscreenBtn').onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+
+    // ---------- CONEXIÓN CON TACTO (MQTT) ----------
+    const tacto = new Tacto();
+    const qrCard = document.getElementById('qrCard');
+    const qrImg = document.getElementById('qrImg');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const connectedDevName = document.getElementById('connectedDevName');
+
+    // Generación del QR (soporta phoneUrl si se publica en GitHub Pages o túnel, o IP local)
+    let currentBaseUrl = '';
+    const updateQR = async () => {
+      const CFG = window.TACTO_CONFIG || {};
+      let base = (CFG.phoneUrl && !CFG.phoneUrl.includes('TU-USUARIO') && !CFG.phoneUrl.includes('__')) ? CFG.phoneUrl : '';
+      if (!base) {
+        try {
+          const info = await (await fetch('info', { cache: 'no-store' })).json();
+          if (info.baseUrl) base = info.baseUrl;
+        } catch (e) {}
+      }
+      if (!base) base = document.baseURI;
+
+      if (base === currentBaseUrl && qrImg.src) return;
+      currentBaseUrl = base;
+
+      const targetUrl = new URL(base, document.baseURI);
+      if (!CFG.phoneUrl || CFG.phoneUrl.includes('TU-USUARIO')) {
+        targetUrl.pathname = targetUrl.pathname.replace(/\/exp(\.html)?\/?$/, '/');
+      }
+      targetUrl.searchParams.set('sala', tacto.sala);
+      const urlStr = targetUrl.href;
+
+      if (targetUrl.hostname.includes('github.io')) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=4&data=${encodeURIComponent(urlStr)}`;
+      } else {
+        qrImg.src = `qr.svg?u=${encodeURIComponent(urlStr)}`;
+        qrImg.onerror = () => {
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=4&data=${encodeURIComponent(urlStr)}`;
+        };
+      }
+    };
+    updateQR();
+
+    // Re-chequear info por si el túnel arrancó segundos después
+    const qrInterval = setInterval(() => {
+      updateQR();
+    }, 2500);
+    tacto.on('dispositivo', d => { if (d && d.online) clearInterval(qrInterval); });
+
+    qrCard.onclick = () => {
+      if (qrCard.classList.contains('minimized')) {
+        qrCard.classList.remove('minimized');
+      }
+    };
+
+    // Estado de conexión MQTT
+    tacto.on('estado', s => {
+      if (s === 'conectado') {
+        statusDot.className = 'connected';
+        statusText.textContent = `Sala ${tacto.sala}`;
+      } else {
+        statusDot.className = '';
+        statusText.textContent = s;
+      }
+    });
+
+    // Detección de dispositivos (teléfonos)
+    tacto.on('dispositivo', d => {
+      if (d && d.online) {
+        connectedDevName.textContent = `Visor: ${d.name}`;
+        qrCard.classList.add('minimized');
+      } else {
+        qrCard.classList.remove('minimized');
+        connectedDevName.textContent = 'Sin visor';
+      }
+    });
+
+    // Recepción de mensajes en tiempo real desde el teléfono
+    tacto.on('datos', (dev, kind, m) => {
+      // 1. Orientación / Giroscopio -> Visor 3D (soporte horizontal y vertical)
+      if (kind === 'motion') {
+        if (m.view) {
+          paisaje.setOrientation(m.view.yaw, m.view.pitch, m.view.roll);
+        } else if (m.landscape) {
+          paisaje.setOrientation(m.landscape.yaw, m.landscape.pitch, m.landscape.roll);
+        } else {
+          const a = tacto.get('ang.a');
+          const b = tacto.get('ang.b');
+          const g = tacto.get('ang.g');
+          paisaje.setOrientation(a, b - 70, -g * 0.4);
+        }
+      }
+
+      // 2. Tacto / Dedos -> Generar ondas en el agua
+      if (kind === 'touch') {
+        const x = tacto.get('touch.x');
+        const y = tacto.get('touch.y');
+        const isDown = tacto.get('touch.down') > 0;
+        paisaje.setTouch(x, y, isDown);
+      }
+
+      // 3. Zoom en aves
+      if (kind === 'zoom') {
+        paisaje.setZoom(m.z || 1);
+      }
+
+      // 4. Soplido de micrófono -> Viento
+      if (kind === 'mic') {
+        const level = tacto.get('mic.level') || 0;
+        paisaje.setMicBlow(level);
+      }
+
+      // 5. Sacudida del teléfono (el agua ahora se mueve exclusivamente con los dedos)
+      if (kind === 'shake') {
+        paisaje.triggerShake(m.intensity || 1);
+      }
+
+      // 6. Apuntar al piso -> Activar cámara real
+      if (kind === 'ground') {
+        paisaje.setGroundMode(m.active);
+      }
+
+      // 7. Cuadro de video de la cámara
+      if (kind === 'cam_frame' && m.img) {
+        paisaje.updateCamFrame(m.img);
+      }
+    });
+
+    // Conectar al broker
+    tacto.connect().catch(e => {
+      statusText.textContent = 'Error: ' + (e.message || e);
+    });
+  </script>
+</body>
+</html>

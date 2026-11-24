@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#0a1219">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Vive Afuera · Visor</title>
+<link rel="stylesheet" href="ui.css">
+<style>
+  * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; margin: 0; padding: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #090e13; color: #f1f5f9;
+    overscroll-behavior: none; user-select: none; -webkit-user-select: none;
+  }
+  body {
+    display: flex; flex-direction: column; min-height: 100%;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    overflow-y: auto;
+  }
+  body.running {
+    overflow: hidden;
+  }
+
+  /* Pantalla Inicial / Permisos — Optimizado para formato 9:16 */
+  #onboarding {
+    margin: auto; align-self: center; max-width: 420px; width: 100%;
+    display: flex; flex-direction: column; gap: 10px;
+    background: rgba(15, 23, 33, 0.95); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--r-l); padding: 18px 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    max-height: 96vh;
+  }
+  #onboarding h1 {
+    font-size: 1.38rem; letter-spacing: 0.1em; color: #6ee7b7; margin: 0; text-align: center; font-weight: 800;
+  }
+  #onboarding .subtitle {
+    font-size: 0.78rem; color: #94a3b8; text-align: center; margin-bottom: 2px;
+  }
+  .perm-item {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--r-m); padding: 8px 12px; font-size: 0.78rem; color: #cbd5e1;
+  }
+  .perm-item span.icon { font-size: 1.2rem; flex-shrink: 0; }
+  .perm-item b { color: #f8fafc; display: block; margin-bottom: 1px; font-size: 0.8rem; }
+
+  .fields-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px;
+  }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field label { font-size: 0.72rem; font-weight: 600; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .field input {
+    width: 100%; min-height: 40px; padding: 8px 12px;
+    border-radius: var(--r-m); background: #131c27; border: 1px solid rgba(255,255,255,0.12);
+    color: #fff; font-size: 15px; font-weight: 500;
+  }
+
+  button.btn-primary {
+    min-height: 50px; border-radius: var(--r-m); border: 0;
+    background: linear-gradient(135deg, #10b981, #059669); color: #022c22;
+    font-size: 1.02rem; font-weight: 800; letter-spacing: 0.04em; cursor: pointer;
+    box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4); margin-top: 4px;
+    display: flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0;
+  }
+  button.btn-primary:active { transform: scale(0.98); }
+  .error-note { color: #f87171; font-size: 0.78rem; text-align: center; min-height: 1.2em; }
+
+  /* Pantalla de Visor y Control */
+  #visorRun {
+    display: none; flex: 1; min-height: 0; flex-direction: column; gap: 8px;
+  }
+
+  /* Barra de Estado Superior */
+  #topBar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(15, 23, 33, 0.75); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px; padding: 6px 14px; font-size: 0.78rem;
+  }
+  #netStatus { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  #netDot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+  #netDot.ok { background: #34d399; box-shadow: 0 0 8px #34d399; }
+  #sensorsActive { display: flex; gap: 8px; font-size: 0.72rem; color: #94a3b8; }
+  .badge-on { color: #6ee7b7; font-weight: 600; }
+
+  /* Superficie Táctil Principal ("Mover el agua" y "Zoom en aves") */
+  #touchSurface {
+    position: relative; flex: 1; min-height: 0;
+    border-radius: var(--r-l); border: 1px solid rgba(255,255,255,0.12);
+    overflow: hidden; touch-action: none;
+    background: radial-gradient(circle at 50% 30%, #152936, #09121a 80%);
+    box-shadow: inset 0 2px 20px rgba(0,0,0,0.5);
+  }
+  #touchCanvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  
+  #surfaceOverlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    justify-content: space-between; padding: 14px; pointer-events: none; text-align: center;
+  }
+  .surface-hint {
+    color: #94a3b8; font-size: 0.82rem; line-height: 1.45; text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+  .surface-hint b { color: #6ee7b7; }
+
+  /* Medidor Flotante de Zoom */
+  #zoomBadge {
+    align-self: center; background: rgba(10, 16, 22, 0.85); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 6px 16px;
+    font-size: 0.85rem; font-weight: 700; color: #fde047; opacity: 0; transition: opacity 0.3s;
+  }
+  #zoomBadge.show { opacity: 1; }
+
+  /* Aviso Modal de Inclinar Celular (Horizontal) */
+  #rotatePrompt {
+    position: fixed; inset: 0; background: rgba(5, 9, 14, 0.95);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px; backdrop-filter: blur(12px);
+    animation: fadeIn 0.35s ease;
+  }
+  #rotatePrompt.active { display: flex; }
+  .rotate-card {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(10, 16, 26, 0.98));
+    border: 1px solid rgba(110, 231, 183, 0.35); border-radius: var(--r-l);
+    padding: 28px 22px; max-width: 400px; width: 100%; text-align: center;
+    box-shadow: 0 16px 50px rgba(0,0,0,0.8), 0 0 30px rgba(16, 185, 129, 0.25);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .rotate-phone-anim {
+    width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;
+    position: relative; margin-bottom: 2px;
+  }
+  .phone-icon-box {
+    width: 36px; height: 62px; border: 3px solid #6ee7b7; border-radius: 8px;
+    position: relative; animation: rotatePhoneAnim 2.5s infinite ease-in-out;
+    box-shadow: 0 0 16px rgba(110, 231, 183, 0.4);
+  }
+  .phone-icon-box::after {
+    content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%; background: #6ee7b7;
+  }
+  @keyframes rotatePhoneAnim {
+    0%, 20% { transform: rotate(0deg); }
+    50%, 80% { transform: rotate(90deg); }
+    100% { transform: rotate(0deg); }
+  }
+  .rotate-card h2 {
+    font-size: 1.35rem; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: 0.03em;
+  }
+  .rotate-card p {
+    font-size: 0.88rem; color: #94a3b8; line-height: 1.45; margin: 0;
+  }
+  .rotate-card p b { color: #6ee7b7; }
+  .btn-rotate {
+    background: linear-gradient(135deg, #10b981, #059669); color: #022c22;
+    border: none; border-radius: var(--r-m); padding: 12px 26px;
+    font-size: 0.95rem; font-weight: 800; cursor: pointer; letter-spacing: 0.03em;
+    box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35); margin-top: 4px;
+    transition: transform 0.15s ease;
+  }
+  .btn-rotate:active { transform: scale(0.97); }
+
+  /* Superposición de Realidad con Marco Rojo Futurista (Estilo Advertencia Sci-Fi) */
+  #groundAlert {
+    position: absolute; inset: 0; background: rgba(28, 4, 8, 0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; padding: 16px;
+    backdrop-filter: blur(8px); animation: fadeIn 0.3s ease;
+  }
+  #groundAlert.active { display: flex; }
+  .hud-warning-container-phone {
+    width: 95%; max-width: 580px; display: flex; flex-direction: column; align-items: center;
+    filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.7));
+  }
+  .hud-warning-header-phone {
+    background: linear-gradient(90deg, #991b1b, #ef4444, #dc2626, #991b1b);
+    color: #fff; padding: 5px 26px; border-radius: 4px 4px 0 0;
+    font-weight: 900; letter-spacing: 0.16em; font-size: 0.92rem; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+    clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+    box-shadow: 0 -4px 18px rgba(239, 68, 68, 0.8);
+    z-index: 2; margin-bottom: -2px;
+  }
+  .ground-box-phone {
+    width: 100%; padding: 22px 18px; position: relative;
+    border: 3px solid #ef4444; background: rgba(14, 2, 4, 0.95);
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.5), inset 0 0 24px rgba(239, 68, 68, 0.3);
+    clip-path: polygon(
+      18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px),
+      calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px
+    );
+  }
+  .ground-box-phone h2 {
+    font-size: 1.35rem; font-weight: 800; color: #fff; margin: 0;
+    letter-spacing: 0.04em; line-height: 1.4;
+    text-shadow: 0 0 14px rgba(255, 60, 90, 0.9), 0 2px 4px #000;
+  }
+  .hud-corner-phone {
+    position: absolute; width: 22px; height: 22px;
+    border-color: #ff2255; border-style: solid; z-index: 5; pointer-events: none;
+  }
+  .hud-corner-phone.top-left { top: 4px; left: 4px; border-width: 3px 0 0 3px; }
+  .hud-corner-phone.top-right { top: 4px; right: 4px; border-width: 3px 3px 0 0; }
+  .hud-corner-phone.bottom-left { bottom: 4px; left: 4px; border-width: 0 0 3px 3px; }
+  .hud-corner-phone.bottom-right { bottom: 4px; right: 4px; border-width: 0 3px 3px 0; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Barra de Sensores Activos en Vivo (Viento, Sacudida, Giro) */
+  #sensorBar {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .sensor-card {
+    background: rgba(15, 23, 33, 0.8); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--r-m); padding: 6px 4px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .sensor-card .title { font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+  .sensor-card .val { font-size: 0.82rem; font-weight: 700; color: #cbd5e1; margin-top: 1px; }
+  .sensor-card.active-mic { border-color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
+  .sensor-card.active-mic .val { color: #38bdf8; }
+  .sensor-card.active-water { border-color: #38bdf8; background: rgba(56, 189, 248, 0.2); box-shadow: 0 0 12px rgba(56, 189, 248, 0.25); }
+  .sensor-card.active-water .val { color: #38bdf8; font-weight: 800; }
+  .sensor-card.active-shake { border-color: #f43f5e; background: rgba(244, 63, 94, 0.15); }
+  .sensor-card.active-shake .val { color: #f43f5e; }
+
+  /* Soporte Celular en Horizontal (Landscape) */
+  @media (orientation: landscape) {
+    body {
+      padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    }
+    #onboarding {
+      max-width: 580px; padding: 12px 18px; gap: 6px;
+    }
+    #topBar { padding: 4px 12px; font-size: 0.72rem; }
+    #surfaceOverlay { padding: 8px 12px; }
+    .surface-hint { font-size: 0.72rem; line-height: 1.25; }
+    #sensorBar { gap: 6px; }
+    .sensor-card { padding: 4px; }
+    .sensor-card .title { font-size: 0.6rem; }
+    .sensor-card .val { font-size: 0.72rem; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- 1. Pantalla de Entrada y Permisos -->
+  <div id="onboarding">
+    <h1>VIVE AFUERA</h1>
+    <div class="subtitle">El celular como visor y mediador de la naturaleza</div>
+
+    <div class="perm-item">
+      <span class="icon">🧭</span>
+      <div>
+        <b>Giroscopio (Orientación 360°)</b>
+        Mueve el teléfono en tus manos para mirar a tu alrededor en el paisaje en primera persona.
+      </div>
+    </div>
+
+    <div class="perm-item">
+      <span class="icon">🌊</span>
+      <div>
+        <b>Tacto en el Río</b>
+        Desliza tus dedos en la pantalla para mover el agua y generar ondas. Pellizca con 2 dedos para hacer zoom en las aves.
+      </div>
+    </div>
+
+    <div class="perm-item">
+      <span class="icon">🌬️</span>
+      <div>
+        <b>Micrófono (Soplido)</b>
+        Sopla al micrófono para levantar el viento en el paisaje (solo medimos intensidad de soplido, no grabamos voz).
+      </div>
+    </div>
+
+    <div class="fields-row">
+      <div class="field">
+        <label for="salaInput">Código de Sala</label>
+        <input id="salaInput" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="24" placeholder="ej: k7m2xq">
+      </div>
+      <div class="field">
+        <label for="nameInput">Tu Nombre</label>
+        <input id="nameInput" autocomplete="off" autocapitalize="off" maxlength="24" placeholder="ej: Visor 1">
+      </div>
+    </div>
+
+    <button id="startBtn" class="btn-primary">
+      <span>✨ Comenzar Experiencia</span>
+    </button>
+    <div class="error-note" id="errorMsg"></div>
+  </div>
+
+  <!-- 2. Superficie Activa del Visor -->
+  <div id="visorRun">
+    <div id="topBar">
+      <div id="netStatus">
+        <span id="netDot"></span>
+        <span id="roomBadge">Conectando…</span>
+      </div>
+      <div id="sensorsActive">
+        <span id="badgeMotion">🧭 Giro</span>
+        <span id="badgeMic">🎙️ Mic</span>
+        <span id="badgeCam">📷 Cam</span>
+      </div>
+    </div>
+
+    <div id="touchSurface">
+      <canvas id="touchCanvas"></canvas>
+      <div id="surfaceOverlay">
+        <div class="surface-hint">
+          <b>🌊 Mueve el agua</b> deslizando tus dedos en la pantalla<br>
+          <b>🦅 Observa las aves</b> pellizcando para hacer zoom
+        </div>
+        <div id="zoomBadge">🦅 Zoom: 1.0x</div>
+        <div class="surface-hint" style="font-size:0.75rem;">
+          💡 Sopla el micrófono para agitar el viento · Desliza tus dedos para generar ondas en el agua
+        </div>
+      </div>
+
+      <!-- Alerta cuando se apunta al suelo (Sorpresa con marco rojo Advertencia) -->
+      <div id="groundAlert">
+        <div class="hud-warning-container-phone">
+          <div class="hud-warning-header-phone">
+            <span style="font-family:monospace;letter-spacing:-2px;color:#fee2e2;opacity:0.85;">///</span>
+            <span>⚠ ADVERTENCIA ⚠</span>
+            <span style="font-family:monospace;letter-spacing:-2px;color:#fee2e2;opacity:0.85;">///</span>
+          </div>
+          <div class="ground-box-phone">
+            <div class="hud-corner-phone top-left"></div>
+            <div class="hud-corner-phone top-right"></div>
+            <div class="hud-corner-phone bottom-left"></div>
+            <div class="hud-corner-phone bottom-right"></div>
+            <h2>Esto no es real, toca pasto de verdad.</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sensorBar">
+      <div class="sensor-card" id="cardWind">
+        <span class="title">🌬️ Viento</span>
+        <span class="val" id="valWind">En calma</span>
+      </div>
+      <div class="sensor-card" id="cardWater">
+        <span class="title">🌊 Río</span>
+        <span class="val" id="valWater">En calma</span>
+      </div>
+      <div class="sensor-card" id="cardTilt">
+        <span class="title">🧭 Inclinación</span>
+        <span class="val" id="valTilt">0°</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal / Aviso: Inclina tu celular para mejor experiencia -->
+  <div id="rotatePrompt">
+    <div class="rotate-card">
+      <div class="rotate-phone-anim">
+        <div class="phone-icon-box"></div>
+      </div>
+      <h2>Inclina tu celular</h2>
+      <p>Gira tu celular a <b>horizontal</b> para la mejor experiencia inmersiva.</p>
+      <button id="rotateDismissBtn" class="btn-rotate">Continuar en horizontal →</button>
+    </div>
+  </div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="config.js"></script>
+  <script src="tacto.js"></script>
+  <script>
+    'use strict';
+    const $ = s => document.querySelector(s);
+    const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch {} return null; };
+    const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+
+    // Parámetros de sala y nombre
+    const Q = new URLSearchParams(location.search);
+    $('#salaInput').value = Tacto.clean(Q.get('sala')) || Tacto.clean(ls('tacto.sala')) || '';
+    $('#nameInput').value = ls('tacto.name') || 'Visor';
+
+    let client = null, base = '', sala = '', devName = '';
+    const devId = ls('tacto.dev') || (ls('tacto.dev', Tacto.rand(6)), ls('tacto.dev'));
+    const pub = (kind, obj, qos = 0, retain = false) => client && client.connected && client.publish(`${base}/${kind}`, JSON.stringify(obj), { qos, retain });
+
+    // =========================================================================
+    // 1. CONEXIÓN MQTT
+    // =========================================================================
+    async function connectMQTT() {
+      base = `tacto/${sala}/${devId}`;
+      const will = { topic: `${base}/status`, payload: JSON.stringify({ online: false, name: devName }), qos: 1, retain: true };
+      const o = await Tacto.open({ clientId: 'tel-' + devId, will });
+      client = o.client;
+
+      client.on('connect', () => {
+        $('#netDot').className = 'ok';
+        $('#roomBadge').textContent = `● Sala ${sala}`;
+        pub('status', { online: true, name: devName, caps: { motion: true, mic: !!micStream, cam: !!camStream } }, 1, true);
+      });
+      client.on('reconnect', () => { $('#netDot').className = ''; $('#roomBadge').textContent = 'Reconectando…'; });
+      client.on('offline', () => { $('#netDot').className = ''; $('#roomBadge').textContent = 'Sin conexión'; });
+    }
+
+    // =========================================================================
+    // 2. GIROSCOPIO, MOVIMIENTO Y ORIENTACIÓN (HORIZONTAL Y VERTICAL)
+    // =========================================================================
+    let ang = [0, 0, 0], rot = [0, 0, 0], acc = [0, 0, 0], lastAcc = [0, 0, 0];
+    let isGroundMode = false;
+
+    // Cálculo matemático de orientación 3D independiente de la orientación del teléfono
+    const degToRad = Math.PI / 180;
+    const q0 = new THREE.Quaternion();
+    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90° alrededor de X
+    const zee = new THREE.Vector3(0, 0, 1);
+    const euler = new THREE.Euler();
+
+    function getDeviceView() {
+      const alpha = ang[0] || 0;
+      const beta = ang[1] || 0;
+      const gamma = ang[2] || 0;
+      const orient = (screen.orientation ? screen.orientation.angle : (window.orientation || 0)) || 0;
+      const isLandscape = Math.abs(orient) === 90 || Math.abs(orient) === 270 || window.innerWidth > window.innerHeight;
+
+      euler.set(beta * degToRad, alpha * degToRad, -gamma * degToRad, 'YXZ');
+      const q = new THREE.Quaternion().setFromEuler(euler);
+      q.multiply(q1);
+      q.multiply(q0.setFromAxisAngle(zee, -orient * degToRad));
+
+      const e = new THREE.Euler().setFromQuaternion(q, 'YXZ');
+      return {
+        yaw: THREE.MathUtils.radToDeg(e.y),
+        pitch: THREE.MathUtils.radToDeg(e.x),
+        roll: THREE.MathUtils.radToDeg(e.z),
+        isLandscape
+      };
+    }
+
+    async function requestMotion() {
+      if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
+        const r1 = await DeviceOrientationEvent.requestPermission();
+        if (r1 !== 'granted') throw new Error('Permiso de giroscopio denegado');
+      }
+      if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+        const r2 = await DeviceMotionEvent.requestPermission();
+        if (r2 !== 'granted') throw new Error('Permiso de movimiento denegado');
+      }
+
+      window.addEventListener('deviceorientation', e => {
+        ang = [e.alpha || 0, e.beta || 0, e.gamma || 0];
+        checkGroundMode();
+      });
+
+      window.addEventListener('devicemotion', e => {
+        const r = e.rotationRate;
+        const a = e.accelerationIncludingGravity;
+        if (r) rot = [r.beta || 0, r.gamma || 0, r.alpha || 0];
+        if (a) {
+          acc = [a.x || 0, a.y || 0, a.z || 0];
+        }
+      });
+
+      // Transmisión de movimiento en tiempo real (~30Hz)
+      setInterval(() => {
+        if (!client?.connected) return;
+        const view = getDeviceView();
+        pub('motion', {
+          t: Date.now(),
+          a: ang.map(v => Math.round(v * 10) / 10),
+          r: rot,
+          c: acc,
+          view: {
+            yaw: Math.round(view.yaw * 10) / 10,
+            pitch: Math.round(view.pitch * 10) / 10,
+            roll: Math.round(view.roll * 10) / 10
+          },
+          landscape: view.isLandscape ? { yaw: view.yaw, pitch: view.pitch, roll: view.roll } : null
+        });
+        $('#valTilt').textContent = `${Math.round(view.pitch)}°`;
+        checkGroundMode();
+      }, 33);
+
+      $('#badgeMotion').className = 'badge-on';
+    }
+
+    // Detección de cuando el usuario baja el teléfono apuntando al suelo a -90 grados
+    function checkGroundMode() {
+      const view = getDeviceView();
+      // Solo se activa cuando el celular está apuntando directamente al suelo (-90°)
+      const pointingDown = view.pitch <= -80;
+
+      if (pointingDown && !isGroundMode) {
+        isGroundMode = true;
+        $('#groundAlert').className = 'active';
+        pub('ground', { active: true });
+        navigator.vibrate?.(40);
+        startCamStream();
+      } else if (!pointingDown && isGroundMode && view.pitch > -72) {
+        isGroundMode = false;
+        $('#groundAlert').className = '';
+        pub('ground', { active: false });
+        stopCamStream();
+      }
+    }
+
+    // =========================================================================
+    // 3. MICRÓFONO (SOPLIDO DE VIENTO)
+    // =========================================================================
+    let micStream = null, micCtx = null, micTimer = null;
+    async function requestMic() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        });
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        micCtx = new AudioCtx();
+        await micCtx.resume();
+        const an = micCtx.createAnalyser();
+        an.fftSize = 512;
+        micCtx.createMediaStreamSource(micStream).connect(an);
+
+        const timeData = new Float32Array(an.fftSize);
+        const freqData = new Uint8Array(an.frequencyBinCount);
+
+        micTimer = setInterval(() => {
+          an.getFloatTimeDomainData(timeData);
+          let sumSq = 0;
+          for (const v of timeData) sumSq += v * v;
+          const level = Math.min(1, Math.sqrt(sumSq / timeData.length) * 5);
+
+          an.getByteFrequencyData(freqData);
+          let lowSum = 0;
+          for (let i = 1; i < 8; i++) lowSum += freqData[i];
+          const low = lowSum / 7 / 255; // Graves típicos de turbulencia de soplido
+
+          // El viento solo se activa cuando se nota que alguien sopla directamente al micrófono
+          // Los soplidos directos provocan fuerte saturación en frecuencias bajas (low > 0.52)
+          const isBlowing = (low > 0.52 && level > 0.28) || (level > 0.68 && low > 0.42);
+          const blowPower = isBlowing ? Math.min(1, Math.max(0, (low - 0.35) * 1.6)) : 0;
+
+          // Si no hay soplido, se envía l: 0 para asegurar calma total y no activar viento con ruido ambiente
+          pub('mic', {
+            t: Date.now(),
+            l: Math.round(blowPower * 100) / 100,
+            b: [Math.round((isBlowing ? low : 0) * 100) / 100, 0, 0]
+          });
+
+          const card = $('#cardWind');
+          if (isBlowing && blowPower > 0.15) {
+            card.className = 'sensor-card active-mic';
+            $('#valWind').textContent = 'Soplando 💨';
+          } else {
+            card.className = 'sensor-card';
+            $('#valWind').textContent = 'En calma';
+          }
+        }, 50);
+
+        $('#badgeMic').className = 'badge-on';
+      } catch (e) {
+        console.warn('Micrófono no otorgado:', e);
+      }
+    }
+
+    // =========================================================================
+    // 4. CÁMARA (TRANSMISIÓN CUANDO SE APUNTA AL SUELO)
+    // =========================================================================
+    let camStream = null, camVideo = null, camInterval = null;
+    const camCanvas = document.createElement('canvas');
+    camCanvas.width = 360; camCanvas.height = 270;
+    const camCtx = camCanvas.getContext('2d', { willReadFrequently: true });
+
+    async function requestCam() {
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: 480, height: 360 },
+          audio: false
+        });
+        camVideo = document.createElement('video');
+        camVideo.playsInline = true;
+        camVideo.muted = true;
+        camVideo.srcObject = camStream;
+        await camVideo.play();
+        $('#badgeCam').className = 'badge-on';
+      } catch (e) {
+        console.warn('Cámara no otorgada:', e);
+      }
+    }
+
+    function startCamStream() {
+      if (!camVideo || camInterval) return;
+      camInterval = setInterval(() => {
+        if (camVideo.readyState >= 2) {
+          camCtx.drawImage(camVideo, 0, 0, camCanvas.width, camCanvas.height);
+          const dataUrl = camCanvas.toDataURL('image/jpeg', 0.5);
+          pub('cam_frame', { t: Date.now(), img: dataUrl });
+        }
+      }, 100); // 10 fps
+    }
+
+    function stopCamStream() {
+      if (camInterval) {
+        clearInterval(camInterval);
+        camInterval = null;
+      }
+    }
+
+    // =========================================================================
+    // 5. TACTO Y GESTO DE PELLIZCO (ZOOM EN AVES)
+    // =========================================================================
+    const surf = $('#touchSurface');
+    const cv = $('#touchCanvas');
+    const gx = cv.getContext('2d');
+    let touches = [];
+    let initialPinchDist = null;
+    let currentZoom = 1.0;
+
+    function resizeCanvas() {
+      const d = window.devicePixelRatio || 1;
+      const r = surf.getBoundingClientRect();
+      cv.width = r.width * d; cv.height = r.height * d;
+      gx.setTransform(d, 0, 0, d, 0, 0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function onTouch(e) {
+      e.preventDefault();
+      const r = surf.getBoundingClientRect();
+      const list = Array.from(e.targetTouches);
+      touches = list.map(t => ({
+        x: clamp((t.clientX - r.left) / r.width),
+        y: clamp((t.clientY - r.top) / r.height),
+        px: t.clientX - r.left,
+        py: t.clientY - r.top,
+      }));
+
+      // Pellizco para zoom (2 dedos)
+      if (list.length === 2) {
+        const dist = Math.hypot(list[0].clientX - list[1].clientX, list[0].clientY - list[1].clientY);
+        if (initialPinchDist === null) {
+          initialPinchDist = dist;
+        } else {
+          const ratio = dist / initialPinchDist;
+          currentZoom = clamp(currentZoom * (1 + (ratio - 1) * 0.4), 1.0, 4.0);
+          initialPinchDist = dist;
+
+          const badge = $('#zoomBadge');
+          badge.textContent = `🦅 Zoom: ${currentZoom.toFixed(1)}x`;
+          badge.classList.add('show');
+          pub('zoom', { z: currentZoom });
+        }
+      } else {
+        initialPinchDist = null;
+        if (list.length === 0) {
+          setTimeout(() => $('#zoomBadge').classList.remove('show'), 1200);
+        }
+      }
+
+      // Actualizar tarjeta del río en la pantalla del celular
+      const cardWater = $('#cardWater');
+      const isDown = touches.length > 0;
+      if (isDown) {
+        cardWater.className = 'sensor-card active-water';
+        $('#valWater').textContent = touches.length > 1 ? `Ondas x${touches.length} 🌊` : 'Ondas 🌊';
+      } else {
+        cardWater.className = 'sensor-card';
+        $('#valWater').textContent = 'En calma';
+      }
+
+      // Envío de tacto para mover el agua y generar ondas
+      pub('touch', {
+        t: Date.now(),
+        n: touches.length,
+        p: touches.map((t, idx) => ({ i: idx + 1, x: t.x, y: t.y, f: 0.7, d: 45 }))
+      });
+    }
+
+    ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(ev => {
+      surf.addEventListener(ev, onTouch, { passive: false });
+    });
+
+    // Dibujar ondas de agua interactivas en pantalla al tocar
+    function drawTouchFx() {
+      gx.clearRect(0, 0, cv.width, cv.height);
+      for (const t of touches) {
+        // Onda translúcida exterior
+        gx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+        gx.beginPath();
+        gx.arc(t.px, t.py, 46, 0, Math.PI * 2);
+        gx.fill();
+
+        // Anillo de onda principal
+        gx.strokeStyle = '#38bdf8';
+        gx.lineWidth = 2.5;
+        gx.beginPath();
+        gx.arc(t.px, t.py, 28, 0, Math.PI * 2);
+        gx.stroke();
+
+        // Anillo central
+        gx.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+        gx.lineWidth = 1.5;
+        gx.beginPath();
+        gx.arc(t.px, t.py, 14, 0, Math.PI * 2);
+        gx.stroke();
+      }
+      requestAnimationFrame(drawTouchFx);
+    }
+    requestAnimationFrame(drawTouchFx);
+
+    // =========================================================================
+    // 6. ENTRADA A LA EXPERIENCIA (ONBOARDING Y ACTIVACIÓN DE SENSORES)
+    // =========================================================================
+    $('#startBtn').onclick = async () => {
+      sala = Tacto.clean($('#salaInput').value);
+      devName = $('#nameInput').value.trim() || 'Visor';
+      if (sala.length < 4) {
+        $('#errorMsg').textContent = 'Escribe el código de sala (mínimo 4 letras/números).';
+        return;
+      }
+      ls('tacto.sala', sala);
+      ls('tacto.name', devName);
+
+      $('#errorMsg').textContent = 'Iniciando sensores…';
+
+      try {
+        await requestMotion();
+      } catch (e) {
+        console.warn(e);
+        $('#errorMsg').textContent = 'Nota: ' + e.message;
+      }
+
+      await requestMic();
+      await requestCam();
+
+      // Mantener la pantalla encendida
+      try { await navigator.wakeLock?.request('screen'); } catch {}
+
+      // Intentar fijar orientación horizontal y pantalla completa
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      } catch {}
+      try {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch {}
+
+      $('#onboarding').style.display = 'none';
+      document.body.classList.add('running');
+
+      const enterVisor = () => {
+        $('#rotatePrompt').classList.remove('active');
+        $('#visorRun').style.display = 'flex';
+        resizeCanvas();
+      };
+
+      // Si el celular está en vertical, mostrar aviso de "Inclina tu celular"
+      const isPortrait = window.innerHeight > window.innerWidth;
+      if (isPortrait) {
+        $('#rotatePrompt').classList.add('active');
+        $('#rotateDismissBtn').onclick = enterVisor;
+
+        const checkLandscape = () => {
+          if (window.innerWidth > window.innerHeight) {
+            window.removeEventListener('resize', checkLandscape);
+            window.removeEventListener('orientationchange', checkLandscape);
+            enterVisor();
+          }
+        };
+        window.addEventListener('resize', checkLandscape);
+        window.addEventListener('orientationchange', checkLandscape);
+      } else {
+        enterVisor();
+      }
+
+      connectMQTT().catch(e => {
+        $('#roomBadge').textContent = 'Error MQTT: ' + e.message;
+      });
+    };
+  </script>
+</body>
+</html>
