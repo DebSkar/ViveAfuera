@@ -1,13 +1,13 @@
-# 🌿 VIVE AFUERA
+# VIVE AFUERA
 ### *La ilusión del tacto digital*
 
-## https://debskar.github.io/ViveAfuera/exp.html
+### https://debskar.github.io/ViveAfuera/exp.html
 
-Una experiencia interactiva, inmersiva y crítica sobre la virtualidad, el contacto físico recíproco y la naturaleza simulada.
+### About: Una experiencia interactiva, inmersiva y crítica sobre la virtualidad, el contacto físico recíproco y la naturaleza simulada.
 
 ---
 
-## 📖 Reflexión Conceptual
+## Reflexión Conceptual
 
 > *"No se puede tocar algo sin ser tocado de vuelta."*
 
@@ -21,7 +21,7 @@ De tanto vivir inmersos en la virtualidad —frente al computador, hipnotizados 
 
 ---
 
-## 🎭 La Experiencia
+## La Experiencia
 
 La instalación se divide en dos polos interactivos: una **pantalla principal** (computador, proyector o monitor de gran formato) y un **dispositivo de mediación** (el teléfono celular del usuario sostenido en formato horizontal).
 
@@ -75,7 +75,7 @@ En ese instante, la obra rechaza a su propio usuario: el dispositivo que promet�
 
 ---
 
-## 🛠️ Arquitectura y Tecnologías
+## Arquitectura y Tecnologías
 
 El proyecto funciona íntegramente sobre tecnologías web estándar, sin necesidad de que el usuario descargue o instale ninguna aplicación externa:
 
@@ -90,7 +90,7 @@ El proyecto funciona íntegramente sobre tecnologías web estándar, sin necesid
 
 ---
 
-## 📂 Estructura de Archivos
+## Estructura de Archivos
 
 ```
 ViveAfuera-main/
@@ -116,7 +116,7 @@ ViveAfuera-main/
 
 ---
 
-## 🚀 Puesta en Marcha
+## Puesta en Marcha
 
 ### Requisitos Previos
 * Tener instalado [Node.js](https://nodejs.org/) (versión 18 o superior).
@@ -157,12 +157,12 @@ ViveAfuera-main/
 
 ---
 
-## 📱 Guía de Interacción para el Celular
+## Guía de Interacción para el Celular
 
 1. **Escanear el Código QR:**
    * Abre la cámara de tu celular y apunta al código QR que aparece en la esquina de la pantalla grande.
 2. **Permisos de Sensores:**
-   * Al pulsar **"✨ Comenzar Experiencia"**, acepta los permisos solicitados de **Giroscopio / Movimiento**, **Micrófono** y **Cámara**.
+   * Al pulsar **" Comenzar Experiencia"**, acepta los permisos solicitados de **Giroscopio / Movimiento**, **Micrófono** y **Cámara**.
 3. **Sostén el Celular en Horizontal:**
    * La interfaz está diseñada para usarse en posición apaisada (*Landscape*), brindando una sensación cinematográfica de control panorámico.
 4. **Interactúa:**
@@ -174,7 +174,7 @@ ViveAfuera-main/
 
 ---
 
-## ⚡ Canales de Telemetría MQTT
+## Canales de Telemetría MQTT
 
 | Tópico MQTT | Contenido | Función en la Instalación |
 |---|---|---|
